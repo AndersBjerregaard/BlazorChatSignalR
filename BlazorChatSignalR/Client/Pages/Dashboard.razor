@@ -1,0 +1,36 @@
+﻿@page "/dashboard"
+@inject NavigationManager NavigationManager
+@implements IAsyncDisposable
+
+<PageTitle>SignalR Dashboard</PageTitle>
+<h3>SignalR Dashboard</h3>
+
+@if (!IsConnected)
+{
+    <div>
+        <p>Connecting...</p>
+    </div>
+}
+else
+{
+
+}
+
+@code {
+    private Guid dashboardId = Guid.NewGuid();
+    private HubConnection? hubConnection;
+
+    private async Task Connect()
+    {
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(NavigationManager.ToAbsoluteUri($"/chathub?{BlazorChatSignalR.Shared.Dashboard.DASHBOARD_ID_ARGUMENT}={dashboardId}"))
+            .Build();
+    }
+
+    protected override Task OnInitializedAsync()
+    {
+        // Connect to hub
+    }
+
+    public bool IsConnected => hubConnection?.State == HubConnectionState.Connected;
+}
