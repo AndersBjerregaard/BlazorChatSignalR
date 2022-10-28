@@ -1,5 +1,6 @@
 ﻿@page "/dashboard"
 @inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
 @implements IAsyncDisposable
 
 <PageTitle>SignalR Dashboard</PageTitle>
@@ -13,24 +14,63 @@
 }
 else
 {
-
+    <textarea style="width: 100%; height: 500px;" @ref="TextAreaRef">
+        @logs
+    </textarea>
 }
 
 @code {
     private Guid dashboardId = Guid.NewGuid();
     private HubConnection? hubConnection;
+    private string logs = string.Empty;
+    ElementReference TextAreaRef;
 
     private async Task Connect()
     {
         hubConnection = new HubConnectionBuilder()
-            .WithUrl(NavigationManager.ToAbsoluteUri($"/chathub?{BlazorChatSignalR.Shared.Dashboard.DASHBOARD_ID_ARGUMENT}={dashboardId}"))
+            .WithUrl(NavigationManager.ToAbsoluteUri($"{BlazorChatSignalR.Shared.Dashboard.DASHBOARD_HUB_URI}?{BlazorChatSignalR.Shared.Dashboard.DASHBOARD_ID_ARGUMENT}={dashboardId}"))
             .Build();
+
+        hubConnection.On<string>(methodName: BlazorChatSignalR.Shared.Dashboard.DASHBOARD_LOG_METHOD_NAME, handler: (message) =>
+        {
+            if (string.IsNullOrEmpty(message))
+            {
+                throw new ArgumentNullException("message parameter was null");
+            }
+            logs += message + "\n";
+            JSRuntime.InvokeVoidAsync("scrollToBottom", TextAreaRef);
+            StateHasChanged();
+        });
+
+        hubConnection.On<string>(
+            methodName: BlazorChatSignalR.Shared.Dashboard.DASHBOARD_UPDATE_METHOD_NAME,
+            handler: (message) =>
+            {
+                if (string.IsNullOrEmpty(message))
+                {
+                    throw new ArgumentNullException("message parameter was null");
+                }
+                logs += message + "\n";
+                JSRuntime.InvokeVoidAsync("scrollToBottom", TextAreaRef);
+                StateHasChanged();
+            }
+        );
+
+        await hubConnection.StartAsync();
     }
 
-    protected override Task OnInitializedAsync()
+    protected override async Task OnInitializedAsync()
     {
-        // Connect to hub
+        await Connect();
     }
 
     public bool IsConnected => hubConnection?.State == HubConnectionState.Connected;
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.DisposeAsync();
+        }
+    }
 }
